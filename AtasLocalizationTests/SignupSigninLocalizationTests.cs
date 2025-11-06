@@ -9,7 +9,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.IO;
-using System.Text;
 
 namespace AtasLocalizationTests
 {
@@ -19,25 +18,22 @@ namespace AtasLocalizationTests
         private ChromeDriver _driver;
         private WebDriverWait _wait;
 
-        private const string RootUrl = "https://atas.bambus.com.ua/";
         private const string BasicAuthUser = "bambuk";
         private const string BasicAuthPass = "Atastraders$";
 
-        // отображаемое имя в меню -> наш код локали
-        private static readonly Dictionary<string, string> LangNameToLocale = new(StringComparer.OrdinalIgnoreCase)
+        private static readonly Dictionary<string, string> LocalePath = new()
         {
-            ["English"] = "EN",
-            ["Русский"] = "RU",
-            ["Français"] = "FR",
-            ["Deutsch"] = "DE",
-            ["Italiano"] = "IT",
-            ["Español"] = "ES",
-            ["Українська"] = "UA",
-            ["Chinese"] = "CN",
-            ["中文"] = "CN",
+            ["EN"] = "",
+            ["RU"] = "ru/",
+            ["FR"] = "fr/",
+            ["DE"] = "de/",
+            ["IT"] = "it/",
+            ["ES"] = "es/",
+            ["CN"] = "cn/",
+            ["UA"] = "ua/"
         };
 
-        // На случай, если сайт опирается на cookie языка
+        // соответствие локали значению cookie WPML
         private static readonly Dictionary<string, string> WpmlCookie = new()
         {
             ["EN"] = "en",
@@ -50,7 +46,6 @@ namespace AtasLocalizationTests
             ["UA"] = "uk",
         };
 
-        // Тексты для проверки (оставлен ваш словарь SignIn)
         private static readonly Dictionary<string, Dictionary<string, string>> I18n = new()
         {
             ["SignIn"] = new()
@@ -135,6 +130,45 @@ namespace AtasLocalizationTests
                 ["IT.SignInBtn"] = "Accedi",
                 ["UA.SignInBtn"] = "Увійти",
                 ["CN.SignInBtn"] = "登录",
+            },
+
+            ["SignUp"] = new()
+            {
+                ["RU.Title"] = "Sign Up",
+                ["EN.Title"] = "Sign Up",
+                ["DE.Title"] = "Sign Up",
+                ["ES.Title"] = "Sign Up",
+                ["FR.Title"] = "Sign Up",
+                ["IT.Title"] = "Sign Up",
+                ["UA.Title"] = "Sign Up",
+                ["CN.Title"] = "Sign Up",
+
+                ["RU.EmailLabel"] = "Email",
+                ["EN.EmailLabel"] = "Email",
+                ["DE.EmailLabel"] = "E-Mail-Adresse",
+                ["ES.EmailLabel"] = "Correo electrónico",
+                ["FR.EmailLabel"] = "Еmail",
+                ["IT.EmailLabel"] = "Email",
+                ["UA.EmailLabel"] = "Еmail",
+                ["CN.EmailLabel"] = "邮箱",
+
+                ["RU.EmailPh"] = "Email (на него придет пароль от ATAS)",
+                ["EN.EmailPh"] = "Enter your email",
+                ["DE.EmailPh"] = "E-Mail-Adresse eingeben",
+                ["ES.EmailPh"] = "Introduce tu correo electrónico",
+                ["FR.EmailPh"] = "Saisissez votre adresse e-mail",
+                ["IT.EmailPh"] = "Inserisci il tuo indirizzo e-mail",
+                ["UA.EmailPh"] = "Введи свій email",
+                ["CN.EmailPh"] = "请输入您的邮箱地址",
+
+                ["RU.SignUpBtn"] = "Зарегистрироваться",
+                ["EN.SignUpBtn"] = "Sign up",
+                ["DE.SignUpBtn"] = "Registrieren",
+                ["ES.SignUpBtn"] = "Registrarse",
+                ["FR.SignUpBtn"] = "S’inscrire",
+                ["IT.SignUpBtn"] = "Registrati",
+                ["UA.SignUpBtn"] = "Зареєструватися",
+                ["CN.SignUpBtn"] = "注册",
             }
         };
 
@@ -152,10 +186,7 @@ namespace AtasLocalizationTests
             // options.AddArgument("--headless=new");
 
             _driver = new ChromeDriver(options);
-            _wait = new WebDriverWait(_driver, TimeSpan.FromSeconds(30));
-
-            // Basic-auth через заголовок (без user:pass@ в URL)
-            EnableBasicAuthHeader();
+            _wait  = new WebDriverWait(_driver, TimeSpan.FromSeconds(30));
         }
 
         [TearDown]
@@ -165,266 +196,59 @@ namespace AtasLocalizationTests
             try { _driver?.Dispose(); } catch { }
         }
 
-        // =================== ОТДЕЛЬНЫЙ ТЕСТ ДЛЯ ОТДЕЛЬНОГО ЯЗЫКА ===================
         [Test]
         [TestCaseSource(nameof(AllLocales))]
-        public void SignIn_Popup_One_Locale(string locale)
+        public void Signup_And_Signin_Popups_Localized_Correctly(string locale)
         {
-            Step("Открыть базовую страницу", () =>
+            var url = $"https://{BasicAuthUser}:{Uri.EscapeDataString(BasicAuthPass)}@atas.bambus.com.ua/" + LocalePath[locale];
+            Log($"Открываем {url}");
+            _driver.Navigate().GoToUrl(url);
+
+            EnsureLanguageCookie(locale); // привести контент к нужной локали
+
+            // ===== Регистрация =====
+            Step("Открыть попап Sign Up", OpenSignup);
+            Step($"Проверка переводов Sign Up ({locale})", () =>
             {
-                _driver.Navigate().GoToUrl(RootUrl);
-                _wait.Until(d => d.Title != null);
+                var soft = new SoftVerify("SignUp");
+                VerifySignupTranslations(locale, soft);
+                soft.ThrowIfAny();
             });
+            Step("Заполнить и отправить форму Sign Up", () => FillAndSubmitSignup(locale));
+            Step("Скриншот следующего экрана после Sign Up", () => TakeScreenshot($"SignUp_{locale}.png"));
+            SafePressEsc();
 
-            Step($"Выбрать язык {locale} из меню", () =>
+            // ===== Авторизация =====
+            Step("Открыть попап Sign In", OpenSigninFromHeader);
+            Step($"Проверка переводов Sign In ({locale})", () =>
             {
-                OpenLangMenu();
-                ClickLanguageByLocale(locale);
-                EnsureLanguageCookie(locale); // закрепим язык
-            });
-
-            Step("Открыть попап авторизации", OpenSigninFromHeader);
-
-            Step($"Проверить тексты в попапе ({locale})", () =>
-            {
-                var soft = new SoftVerify($"SignIn-{locale}");
-                VerifySigninTranslations_AgainstNewMarkup_WithSmartWaits_AllSoft(locale, soft);
-                soft.ThrowIfAny(); // СБОР всех несоответствий, падение в конце
+                var soft = new SoftVerify("SignIn");
+                VerifySigninTranslations(locale, soft);
+                soft.ThrowIfAny();
             });
         }
 
         private static IEnumerable<string> AllLocales()
-            => new[] { "EN", "RU", "FR", "DE", "IT", "ES", "UA", "CN" };
+            => new[] { "EN", "RU", "FR", "DE", "IT", "ES", "CN", "UA" };
 
-        // =================== Работа с языковым меню ===================
-
-        private void OpenLangMenu()
+        // ---------- helpers & logging ----------
+        private void Step(string title, Action action)
         {
-            var btn = _wait.Until(d => d.FindElement(By.CssSelector("button.btn.langs-wrapper-lang")));
-            ((IJavaScriptExecutor)_driver).ExecuteScript("arguments[0].click();", btn);
-            _wait.Until(d => d.FindElement(By.CssSelector("nav.langs-wrapper-dropdown")));
-        }
-
-        private void ClickLanguageByLocale(string locale)
-        {
-            var container = _wait.Until(d => d.FindElement(By.CssSelector("nav.langs-wrapper-dropdown")));
-            var links = container.FindElements(By.CssSelector("a.link"));
-
-            foreach (var a in links)
-            {
-                var name = (a.Text ?? "").Trim();
-                if (string.IsNullOrEmpty(name))
-                    name = (a.GetAttribute("title") ?? "").Trim();
-
-                var href = a.GetAttribute("href") ?? "";
-                var guess = !string.IsNullOrEmpty(name) && LangNameToLocale.TryGetValue(name, out var byName)
-                    ? byName
-                    : GuessLocaleFromHref(href);
-
-                if (string.Equals(guess, locale, StringComparison.OrdinalIgnoreCase))
-                {
-                    ((IJavaScriptExecutor)_driver).ExecuteScript("arguments[0].click();", a);
-                    // дождёмся загрузки
-                    _wait.Until(_ => (_driver.Url ?? "").Length > 0 && _driver.Title != null);
-                    return;
-                }
-            }
-            throw new NoSuchElementException($"Не найдена ссылка языка для локали {locale}.");
-        }
-
-        private static string GuessLocaleFromHref(string href)
-        {
-            if (href.Contains("/ru/", StringComparison.OrdinalIgnoreCase)) return "RU";
-            if (href.Contains("/fr/", StringComparison.OrdinalIgnoreCase)) return "FR";
-            if (href.Contains("/de/", StringComparison.OrdinalIgnoreCase)) return "DE";
-            if (href.Contains("/it/", StringComparison.OrdinalIgnoreCase)) return "IT";
-            if (href.Contains("/es/", StringComparison.OrdinalIgnoreCase)) return "ES";
-            if (href.Contains("/cn/", StringComparison.OrdinalIgnoreCase)) return "CN";
-            if (href.Contains("/ua/", StringComparison.OrdinalIgnoreCase)) return "UA";
-            return "EN";
-        }
-
-        // =================== Попап авторизации ===================
-
-        private void OpenSigninFromHeader()
-        {
-            var signIn = _wait.Until(d => d.FindElement(By.CssSelector("a.header-log-in[href='#form-signin']")));
-            ((IJavaScriptExecutor)_driver).ExecuteScript("arguments[0].click();", signIn);
-
-            // Ждём саму форму
-            _wait.Until(d => d.FindElement(By.XPath("//form[@action='/v2/account/signIn']")));
-
-            // И пока попап реально стал видимым (анимация/прозрачность)
-            WaitPopupVisibleRoot();
-        }
-
-        // ========= «Умные» ожидания для текстов и видимости попапа =========
-
-        // ждём элемент внутри scope и возвращаем НЕПУСТОЙ innerText (или "" без исключения)
-        private string WaitNonEmptyText(IWebElement scope, By by, TimeSpan? timeout = null)
-        {
+            Log($"→ {title}");
             try
             {
-                var wait = new WebDriverWait(_driver, timeout ?? TimeSpan.FromSeconds(15));
-                return wait.Until(_ =>
-                {
-                    try
-                    {
-                        var el = scope.FindElement(by);
-                        var txt = (string)((IJavaScriptExecutor)_driver)
-                            .ExecuteScript("return (arguments[0].innerText||'').trim();", el);
-                        return string.IsNullOrEmpty(txt) ? null : txt;
-                    }
-                    catch { return null; }
-                });
+                action();
+                Log($"✓ {title}");
             }
-            catch
+            catch (Exception ex)
             {
-                return ""; // не роняем тест — вернём пустую строку, soft-assert это зафиксирует
+                Log($"✗ {title}. Ошибка: {ex.Message}");
+                var fname = SanitizeFileName($"{DateTime.UtcNow:yyyyMMdd_HHmmss}_{title}.png");
+                TakeScreenshot(fname);
+                SavePopupHtmlForDebug($"{Path.GetFileNameWithoutExtension(fname)}.html");
+                throw;
             }
         }
-
-        // безопасное чтение атрибута (без исключений)
-        private string SafeAttr(IWebElement scope, By by, string attr, string @default = "")
-        {
-            try
-            {
-                var el = scope.FindElement(by);
-                return el?.GetAttribute(attr) ?? @default;
-            }
-            catch { return @default; }
-        }
-
-        // ждём корневой контейнер попапа, пока он станет реально видимым (не прозрачен)
-        private IWebElement WaitPopupVisibleRoot()
-        {
-            return _wait.Until(d =>
-            {
-                var roots = d.FindElements(By.CssSelector("div.popup-content"));
-                var root = roots.FirstOrDefault();
-                if (root == null) return null;
-                try
-                {
-                    var visible = (bool)((IJavaScriptExecutor)d).ExecuteScript(@"
-                        const el = arguments[0];
-                        if(!el) return false;
-                        const s = getComputedStyle(el);
-                        const r = el.getBoundingClientRect();
-                        return s.visibility !== 'hidden' && s.opacity !== '0' && r.width>0 && r.height>0;
-                    ", root);
-                    return visible ? root : null;
-                }
-                catch { return null; }
-            });
-        }
-
-        // ---------- Проверка попапа авторизации: ВСЁ через soft-assert, НИЧЕГО не бросаем внутри ----------
-        private void VerifySigninTranslations_AgainstNewMarkup_WithSmartWaits_AllSoft(string locale, SoftVerify soft)
-        {
-            // находим root попапа, но даже если не нашли — продолжим с пустыми значениями
-            IWebElement root = null;
-            try
-            {
-                root = _wait.Until(d => d.FindElement(
-                    By.XPath("//div[contains(@class,'popup-content')]//form[@action='/v2/account/signIn']/ancestor::div[contains(@class,'popup-content')]")));
-                WaitPopupVisibleRoot();
-            }
-            catch
-            {
-                soft.Contains("PopupRoot", "FOUND", "NOT FOUND");
-                // дальше будем читать значения с пустыми результатами
-            }
-
-            // маленький локальный помощник: если root нет — вернём пустые строки
-            string T(By by, int seconds = 15) => root == null ? "" : WaitNonEmptyText(root, by, TimeSpan.FromSeconds(seconds));
-            string A(By by, string attr) => root == null ? "" : SafeAttr(root, by, attr);
-
-            // Title (в EN может быть 'Sign-In')
-            var title = T(By.CssSelector(".neue-40-bold.title"));
-            var expectedTitle = I18n["SignIn"][$"{locale}.Title"];
-            if (!(SoftEquals(expectedTitle, title) || SoftEquals(expectedTitle.Replace(" ", "-"), title)))
-                soft.Contains("Title", expectedTitle, title);
-
-            // E-mail label
-            var emailLabel = T(By.XPath(".//form[@action='/v2/account/signIn']//label[1]//span[contains(@class,'placeholder')]"));
-            var expectEmailLabel = I18n["SignIn"][$"{locale}.EmailLabel"];
-            if (!(SoftEquals(expectEmailLabel, emailLabel) || SoftEquals(expectEmailLabel.Insert(1, "-"), emailLabel)))
-                soft.Contains("EmailLabel", expectEmailLabel, emailLabel);
-
-            // Email placeholder
-            var emailPh = A(By.CssSelector("form[action='/v2/account/signIn'] input[type='email'][name='email']"), "placeholder");
-            soft.Equal("EmailPh", I18n["SignIn"][$"{locale}.EmailPh"], emailPh);
-
-            // Password label
-            var passLabel = T(By.XPath(".//form[@action='/v2/account/signIn']//label[2]//span[contains(@class,'placeholder')]"));
-            soft.Contains("PassLabel", I18n["SignIn"][$"{locale}.PassLabel"], passLabel);
-
-            // Password placeholder
-            var passPh = A(By.CssSelector("form[action='/v2/account/signIn'] input[type='password'][name='password']"), "placeholder");
-            soft.Equal("PassPh", I18n["SignIn"][$"{locale}.PassPh"], passPh);
-
-            // Forgot
-            var forgot = T(By.CssSelector("form[action='/v2/account/signIn'] button.forgot"));
-            soft.Contains("Forgot", I18n["SignIn"][$"{locale}.Forgot"], forgot);
-
-            // No account?
-            var noAcc = T(By.CssSelector("form[action='/v2/account/signIn'] .cta-bottom p"));
-            soft.Contains("NoAcc", I18n["SignIn"][$"{locale}.NoAcc"], noAcc);
-
-            // Sign up
-            var signUpLink = T(By.CssSelector("form[action='/v2/account/signIn'] .cta-bottom button[aria-label*='Sign up' i]"));
-            soft.Contains("SignUpLink", I18n["SignIn"][$"{locale}.SignUpLink"], signUpLink);
-
-            // Submit (в разметке — "Submit"; допускаем "Sign In" из словаря)
-            var submitText = T(By.CssSelector("form[action='/v2/account/signIn'] button[type='submit'] .btn-text"));
-            var expectedBtn = I18n["SignIn"][$"{locale}.SignInBtn"];
-            if (!(SoftEquals(expectedBtn, submitText) || SoftEquals("Submit", submitText)))
-                soft.Contains("Button", expectedBtn, submitText);
-        }
-
-        // =================== Утилиты ===================
-
-        private void EnableBasicAuthHeader()
-        {
-            var token = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{BasicAuthUser}:{BasicAuthPass}"));
-            _driver.ExecuteCdpCommand("Network.enable", new Dictionary<string, object>());
-            _driver.ExecuteCdpCommand("Network.setExtraHTTPHeaders", new Dictionary<string, object>
-            {
-                ["headers"] = new Dictionary<string, object>
-                {
-                    ["Authorization"] = $"Basic {token}"
-                }
-            });
-        }
-
-        private void EnsureLanguageCookie(string locale)
-        {
-            if (!WpmlCookie.TryGetValue(locale, out var code))
-                code = "en";
-
-            try { _driver.Manage().Cookies.DeleteCookieNamed("wp-wpml_current_language"); } catch { }
-
-            _driver.Manage().Cookies.AddCookie(new Cookie(
-                "wp-wpml_current_language",
-                code,
-                ".bambus.com.ua", // общий домен
-                "/",
-                DateTime.UtcNow.AddDays(1)));
-
-            _driver.Navigate().Refresh();
-        }
-
-        private static string Normalize(string s)
-        {
-            if (s == null) return string.Empty;
-            return new string(
-                s.Replace("\u00A0", " ")
-                 .Replace("-", " ")
-                 .Where(ch => !char.IsWhiteSpace(ch))
-                 .ToArray()
-            ).ToLowerInvariant();
-        }
-        private static bool SoftEquals(string expect, string actual) => Normalize(expect) == Normalize(actual);
 
         private void Log(string message)
         {
@@ -437,6 +261,252 @@ namespace AtasLocalizationTests
             foreach (var c in Path.GetInvalidFileNameChars()) s = s.Replace(c, '_');
             return s;
         }
+
+        private void SavePopupHtmlForDebug(string fileName)
+        {
+            try
+            {
+                var html = _driver.PageSource ?? "";
+                File.WriteAllText(fileName, html);
+                TestContext.AddTestAttachment(fileName);
+                Log($"HTML сохранён: {fileName}");
+            }
+            catch { }
+        }
+
+        // ---------- Язык (cookie) ----------
+        private void EnsureLanguageCookie(string locale)
+        {
+            if (!WpmlCookie.TryGetValue(locale, out var code))
+                code = "en";
+
+            try { _driver.Manage().Cookies.DeleteCookieNamed("wp-wpml_current_language"); } catch { }
+
+            _driver.Manage().Cookies.AddCookie(new Cookie(
+                "wp-wpml_current_language",
+                code,
+                "atas.bambus.com.ua",
+                "/",
+                DateTime.UtcNow.AddDays(1)));
+
+            _driver.Navigate().Refresh();
+        }
+
+        // ---------- Открытие попапов ----------
+        private void OpenSignup()
+        {
+            var startBtn = _wait.Until(d => d.FindElement(By.CssSelector("a.btn[href='#form-signup'], a.btn.btn--gradient[href='#form-signup']")));
+            ClickByJs(startBtn);
+
+            SwitchToPopupFrameIfAny();
+            WaitPopupRoot("signup");
+        }
+
+        private void OpenSigninFromHeader()
+        {
+            var signIn = _wait.Until(d => d.FindElement(By.CssSelector("a.header-log-in[href='#form-signin'], a[href='#form-signin']")));
+            Log($"Кликаем Sign In: {signIn.Text}");
+            ClickByJs(signIn);
+
+            SwitchToPopupFrameIfAny();
+            WaitPopupRoot("signin");
+        }
+
+        // ---------- Верификация переводов ----------
+        private void VerifySignupTranslations(string locale, SoftVerify soft)
+        {
+            var root = WaitPopupRoot("signup");
+
+            // Title
+            var title = TextWithin(root,
+                By.CssSelector(".neue-40-bold.title, .popup-title, h2, .title"),
+                By.XPath(".//*[self::h2 or self::span][contains(.,'Sign')]")
+            );
+            soft.Contains("Title", I18n["SignUp"][$"{locale}.Title"], title);
+
+            // Email label
+            var emailLabel = TextWithin(root,
+                By.XPath(".//label[.//span[contains(@class,'placeholder')]]//span[contains(@class,'api-wrapper')]"),
+                By.XPath(".//*[self::label or self::span][contains(translate(., 'EMAILЕМАІL', 'emaileмаіл'), 'email')]")
+            );
+            soft.Contains("EmailLabel", I18n["SignUp"][$"{locale}.EmailLabel"], emailLabel);
+
+            // Email placeholder
+            var email = root.FindElement(By.CssSelector("input[type='email'], input[name*='email' i]"));
+            soft.Equal("EmailPh", I18n["SignUp"][$"{locale}.EmailPh"], email.GetAttribute("placeholder") ?? "");
+
+            // Button text
+            var signUpBtn = FirstDisplayed(root,
+                By.CssSelector("button[type='submit']"),
+                By.CssSelector("[role='button']"),
+                By.XPath(".//button|.//a")
+            );
+            soft.Contains("Button", I18n["SignUp"][$"{locale}.SignUpBtn"], signUpBtn.Text.Trim());
+        }
+
+        private void VerifySigninTranslations(string locale, SoftVerify soft)
+        {
+            var root = WaitPopupRoot("signin");
+
+            var title = TextWithin(root,
+                By.CssSelector(".neue-40-bold.title, .popup-title, h2, .title"),
+                By.XPath(".//*[self::h2 or self::span]")
+            );
+            soft.Contains("Title", I18n["SignIn"][$"{locale}.Title"], title);
+
+            var emailLabel = TextWithin(root,
+                By.XPath(".//*[self::label or self::span][contains(.,'mail') or contains(.,'邮箱') or contains(.,'Еmail')]")
+            );
+            soft.Contains("EmailLabel", I18n["SignIn"][$"{locale}.EmailLabel"], emailLabel);
+
+            var email = root.FindElements(By.CssSelector("input[type='email'], input[name*='email' i]")).FirstOrDefault();
+            if (email != null)
+                soft.Equal("EmailPh", I18n["SignIn"][$"{locale}.EmailPh"], email.GetAttribute("placeholder") ?? "");
+            else
+                Log("Внимание: поле email не найдено в Sign In");
+
+            var pass = root.FindElements(By.CssSelector("input[type='password'], input[name*='pass' i]")).FirstOrDefault();
+            if (pass != null)
+            {
+                var passLabel = TextWithin(root,
+                    By.XPath(".//*[self::label or self::span][contains(.,'Pass') or contains(.,'Пароль') or contains(.,'密码')]")
+                );
+                soft.Contains("PassLabel", I18n["SignIn"][$"{locale}.PassLabel"], passLabel);
+                soft.Equal("PassPh", I18n["SignIn"][$"{locale}.PassPh"], pass.GetAttribute("placeholder") ?? "");
+            }
+            else
+                Log("Внимание: поле password не найдено в Sign In");
+
+            var forgot = TextWithin(root,
+                By.XPath(".//a[contains(@href,'forgot') or contains(.,'?') or contains(.,'Забыл') or contains(.,'Passwort vergessen') or contains(.,'Mot de passe') or contains(.,'Забули') or contains(.,'忘记')]")
+            );
+            if (!string.IsNullOrEmpty(forgot))
+                soft.Contains("Forgot", I18n["SignIn"][$"{locale}.Forgot"], forgot);
+
+            var noAcc = TextWithin(root,
+                By.XPath(".//*[contains(text(),'No account') or contains(text(),'Нет учетной записи') or contains(text(),'Noch kein Konto') or contains(text(),'Pas de compte') or contains(text(),'Немає облікового запису') or contains(text(),'没有账号')]")
+            );
+            if (!string.IsNullOrEmpty(noAcc))
+                soft.Contains("NoAcc", I18n["SignIn"][$"{locale}.NoAcc"], noAcc);
+
+            var signUpLink = TextWithin(root,
+                By.XPath(".//a[contains(@href,'signup') or contains(.,'Sign up') or contains(.,'Зарегистр') or contains(.,'Registr') or contains(.,'S’inscrire') or contains(.,'注册')]")
+            );
+            if (!string.IsNullOrEmpty(signUpLink))
+                soft.Contains("SignUpLink", I18n["SignIn"][$"{locale}.SignUpLink"], signUpLink);
+
+            var signInBtn = TextWithin(root,
+                By.CssSelector("button[type='submit'], [role='button']")
+            );
+            if (!string.IsNullOrEmpty(signInBtn))
+                soft.Contains("Button", I18n["SignIn"][$"{locale}.SignInBtn"], signInBtn);
+        }
+
+        // ---------- Действия с формой Sign Up ----------
+        private void FillAndSubmitSignup(string _locale)
+        {
+            var root = WaitPopupRoot("signup");
+            var form = root.FindElements(By.CssSelector("form")).FirstOrDefault() ?? root;
+
+            var email = form.FindElement(By.CssSelector("input[type='email'], input[name*='email' i]"));
+            var value = RandomEmail();
+            Log($"Ввод email: {value}");
+            email.Clear();
+            email.SendKeys(value);
+
+            foreach (var cb in form.FindElements(By.CssSelector("input[type='checkbox']")))
+                if (!cb.Selected) cb.Click();
+
+            var submit = FirstDisplayed(form,
+                By.CssSelector("button[type='submit']"),
+                By.CssSelector("[role='button']")
+            );
+            _wait.Until(_ => submit.Enabled);
+            Log("Жмём Sign Up");
+            ClickByJs(submit);
+
+            _wait.Until(_ =>
+            {
+                try
+                {
+                    return !root.Displayed ||
+                           root.FindElements(By.CssSelector(".success, .error, .custom-form[data-msgs], [data-state*='success'], [data-state*='error']")).Count > 0;
+                }
+                catch { return true; }
+            });
+        }
+
+        // ---------- Вспомогательные ----------
+        private void ClickByJs(IWebElement el)
+            => ((IJavaScriptExecutor)_driver).ExecuteScript("arguments[0].click();", el);
+
+        private void SwitchToPopupFrameIfAny()
+        {
+            try
+            {
+                var frames = _driver.FindElements(By.CssSelector("iframe[src*='signup'], iframe[src*='signin'], iframe[id*='signup'], iframe[id*='signin']"));
+                if (frames.Count > 0) _driver.SwitchTo().Frame(frames[0]);
+            }
+            catch { }
+        }
+
+        private IWebElement WaitPopupRoot(string kind /* "signup" | "signin" */)
+        {
+            var locators = new By[]
+            {
+                By.CssSelector($"#form-{kind}"),
+                By.CssSelector($"[id*='form-{kind}']"),
+                By.CssSelector($"[data-popup-name*='{kind}']"),
+                By.CssSelector($".popup-content[data-popup*='{kind}']"),
+                By.CssSelector($".popup[data-popup*='{kind}']"),
+            };
+
+            foreach (var by in locators)
+            {
+                try
+                {
+                    var root = _wait.Until(d =>
+                    {
+                        var el = d.FindElements(by).FirstOrDefault();
+                        return (el != null && el.Displayed) ? el : null;
+                    });
+                    if (root != null) return root;
+                }
+                catch { }
+            }
+            throw new WebDriverTimeoutException($"Не найден попап '{kind}' по ожидаемым локаторам.");
+        }
+
+        private string TextWithin(IWebElement scope, params By[] locators)
+        {
+            foreach (var by in locators)
+            {
+                try
+                {
+                    var el = _wait.Until(_ =>
+                    {
+                        var candidate = scope.FindElements(by).FirstOrDefault(e => e.Displayed && !string.IsNullOrWhiteSpace(e.Text));
+                        return candidate;
+                    });
+                    if (el != null) return el.Text.Trim();
+                }
+                catch { }
+            }
+            return string.Empty;
+        }
+
+        private IWebElement FirstDisplayed(IWebElement scope, params By[] locators)
+        {
+            foreach (var by in locators)
+            {
+                var el = scope.FindElements(by).FirstOrDefault(e => e.Displayed);
+                if (el != null) return el;
+            }
+            throw new NoSuchElementException($"Не найден видимый элемент по: {string.Join(" | ", locators.Select(l => l.ToString()))}");
+        }
+
+        private static string RandomEmail()
+            => $"qatest_{DateTime.UtcNow:yyyyMMdd_HHmmss}_{Guid.NewGuid().ToString("N")[..6]}@example.com";
 
         private void TakeScreenshot(string fileName)
         {
@@ -452,42 +522,12 @@ namespace AtasLocalizationTests
             catch { }
         }
 
-        private void SavePageHtmlForDebug(string fileName)
-        {
-            try
-            {
-                var html = _driver.PageSource ?? "";
-                File.WriteAllText(fileName, html);
-                TestContext.AddTestAttachment(fileName);
-                Log($"HTML сохранён: {fileName}");
-            }
-            catch { }
-        }
-
-        private void Step(string title, Action action)
-        {
-            Log($"→ {title}");
-            try
-            {
-                action();
-                Log($"✓ {title}");
-            }
-            catch (Exception ex)
-            {
-                Log($"✗ {title}. Ошибка: {ex.Message}");
-                var fname = SanitizeFileName($"{DateTime.UtcNow:yyyyMMdd_HHmmss}_{title}.png");
-                TakeScreenshot(fname);
-                SavePageHtmlForDebug($"{Path.GetFileNameWithoutExtension(fname)}.html");
-                throw;
-            }
-        }
-
         private void SafePressEsc()
         {
             try { new Actions(_driver).SendKeys(Keys.Escape).Perform(); } catch { }
         }
 
-        // -------- Soft assertions: копит ВСЕ ошибки и роняет тест только в конце --------
+        // -------- Soft assertions --------
         private sealed class SoftVerify
         {
             private readonly List<string> _errors = new();
