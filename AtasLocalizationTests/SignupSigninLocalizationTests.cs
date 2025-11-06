@@ -50,7 +50,7 @@ namespace AtasLocalizationTests
             ["UA"] = "uk",
         };
 
-        // Тексты для проверки (оставил ваш словарь SignIn)
+        // Тексты для проверки (оставлен ваш словарь SignIn)
         private static readonly Dictionary<string, Dictionary<string, string>> I18n = new()
         {
             ["SignIn"] = new()
@@ -180,8 +180,7 @@ namespace AtasLocalizationTests
             {
                 OpenLangMenu();
                 ClickLanguageByLocale(locale);
-                // на всякий — закрепим cookie языка
-                EnsureLanguageCookie(locale);
+                EnsureLanguageCookie(locale); // закрепим язык
             });
 
             Step("Открыть попап авторизации", OpenSigninFromHeader);
@@ -189,8 +188,8 @@ namespace AtasLocalizationTests
             Step($"Проверить тексты в попапе ({locale})", () =>
             {
                 var soft = new SoftVerify($"SignIn-{locale}");
-                VerifySigninTranslations_AgainstNewMarkup(locale, soft);
-                soft.ThrowIfAny();
+                VerifySigninTranslations_AgainstNewMarkup_WithSmartWaits_AllSoft(locale, soft);
+                soft.ThrowIfAny(); // СБОР всех несоответствий, падение в конце
             });
         }
 
@@ -251,52 +250,133 @@ namespace AtasLocalizationTests
         {
             var signIn = _wait.Until(d => d.FindElement(By.CssSelector("a.header-log-in[href='#form-signin']")));
             ((IJavaScriptExecutor)_driver).ExecuteScript("arguments[0].click();", signIn);
+
+            // Ждём саму форму
             _wait.Until(d => d.FindElement(By.XPath("//form[@action='/v2/account/signIn']")));
+
+            // И пока попап реально стал видимым (анимация/прозрачность)
+            WaitPopupVisibleRoot();
         }
 
-        private void VerifySigninTranslations_AgainstNewMarkup(string locale, SoftVerify soft)
-        {
-            var root = _wait.Until(d => d.FindElement(
-                By.XPath("//div[contains(@class,'popup-content')]//form[@action='/v2/account/signIn']/ancestor::div[contains(@class,'popup-content')]")));
+        // ========= «Умные» ожидания для текстов и видимости попапа =========
 
-            // Title (в вёрстке у EN может быть 'Sign-In')
-            var title = root.FindElement(By.CssSelector(".neue-40-bold.title")).Text.Trim();
+        // ждём элемент внутри scope и возвращаем НЕПУСТОЙ innerText (или "" без исключения)
+        private string WaitNonEmptyText(IWebElement scope, By by, TimeSpan? timeout = null)
+        {
+            try
+            {
+                var wait = new WebDriverWait(_driver, timeout ?? TimeSpan.FromSeconds(15));
+                return wait.Until(_ =>
+                {
+                    try
+                    {
+                        var el = scope.FindElement(by);
+                        var txt = (string)((IJavaScriptExecutor)_driver)
+                            .ExecuteScript("return (arguments[0].innerText||'').trim();", el);
+                        return string.IsNullOrEmpty(txt) ? null : txt;
+                    }
+                    catch { return null; }
+                });
+            }
+            catch
+            {
+                return ""; // не роняем тест — вернём пустую строку, soft-assert это зафиксирует
+            }
+        }
+
+        // безопасное чтение атрибута (без исключений)
+        private string SafeAttr(IWebElement scope, By by, string attr, string @default = "")
+        {
+            try
+            {
+                var el = scope.FindElement(by);
+                return el?.GetAttribute(attr) ?? @default;
+            }
+            catch { return @default; }
+        }
+
+        // ждём корневой контейнер попапа, пока он станет реально видимым (не прозрачен)
+        private IWebElement WaitPopupVisibleRoot()
+        {
+            return _wait.Until(d =>
+            {
+                var roots = d.FindElements(By.CssSelector("div.popup-content"));
+                var root = roots.FirstOrDefault();
+                if (root == null) return null;
+                try
+                {
+                    var visible = (bool)((IJavaScriptExecutor)d).ExecuteScript(@"
+                        const el = arguments[0];
+                        if(!el) return false;
+                        const s = getComputedStyle(el);
+                        const r = el.getBoundingClientRect();
+                        return s.visibility !== 'hidden' && s.opacity !== '0' && r.width>0 && r.height>0;
+                    ", root);
+                    return visible ? root : null;
+                }
+                catch { return null; }
+            });
+        }
+
+        // ---------- Проверка попапа авторизации: ВСЁ через soft-assert, НИЧЕГО не бросаем внутри ----------
+        private void VerifySigninTranslations_AgainstNewMarkup_WithSmartWaits_AllSoft(string locale, SoftVerify soft)
+        {
+            // находим root попапа, но даже если не нашли — продолжим с пустыми значениями
+            IWebElement root = null;
+            try
+            {
+                root = _wait.Until(d => d.FindElement(
+                    By.XPath("//div[contains(@class,'popup-content')]//form[@action='/v2/account/signIn']/ancestor::div[contains(@class,'popup-content')]")));
+                WaitPopupVisibleRoot();
+            }
+            catch
+            {
+                soft.Contains("PopupRoot", "FOUND", "NOT FOUND");
+                // дальше будем читать значения с пустыми результатами
+            }
+
+            // маленький локальный помощник: если root нет — вернём пустые строки
+            string T(By by, int seconds = 15) => root == null ? "" : WaitNonEmptyText(root, by, TimeSpan.FromSeconds(seconds));
+            string A(By by, string attr) => root == null ? "" : SafeAttr(root, by, attr);
+
+            // Title (в EN может быть 'Sign-In')
+            var title = T(By.CssSelector(".neue-40-bold.title"));
             var expectedTitle = I18n["SignIn"][$"{locale}.Title"];
             if (!(SoftEquals(expectedTitle, title) || SoftEquals(expectedTitle.Replace(" ", "-"), title)))
                 soft.Contains("Title", expectedTitle, title);
 
             // E-mail label
-            var emailLabel = root.FindElement(By.XPath(".//form[@action='/v2/account/signIn']//label[1]//span[contains(@class,'placeholder')]")).Text.Trim();
+            var emailLabel = T(By.XPath(".//form[@action='/v2/account/signIn']//label[1]//span[contains(@class,'placeholder')]"));
             var expectEmailLabel = I18n["SignIn"][$"{locale}.EmailLabel"];
             if (!(SoftEquals(expectEmailLabel, emailLabel) || SoftEquals(expectEmailLabel.Insert(1, "-"), emailLabel)))
                 soft.Contains("EmailLabel", expectEmailLabel, emailLabel);
 
             // Email placeholder
-            var emailPh = root.FindElement(By.CssSelector("form[action='/v2/account/signIn'] input[type='email'][name='email']"))
-                              .GetAttribute("placeholder") ?? "";
+            var emailPh = A(By.CssSelector("form[action='/v2/account/signIn'] input[type='email'][name='email']"), "placeholder");
             soft.Equal("EmailPh", I18n["SignIn"][$"{locale}.EmailPh"], emailPh);
 
-            // Password label + placeholder
-            var passLabel = root.FindElement(By.XPath(".//form[@action='/v2/account/signIn']//label[2]//span[contains(@class,'placeholder')]")).Text.Trim();
+            // Password label
+            var passLabel = T(By.XPath(".//form[@action='/v2/account/signIn']//label[2]//span[contains(@class,'placeholder')]"));
             soft.Contains("PassLabel", I18n["SignIn"][$"{locale}.PassLabel"], passLabel);
 
-            var passPh = root.FindElement(By.CssSelector("form[action='/v2/account/signIn'] input[type='password'][name='password']"))
-                             .GetAttribute("placeholder") ?? "";
+            // Password placeholder
+            var passPh = A(By.CssSelector("form[action='/v2/account/signIn'] input[type='password'][name='password']"), "placeholder");
             soft.Equal("PassPh", I18n["SignIn"][$"{locale}.PassPh"], passPh);
 
             // Forgot
-            var forgot = root.FindElement(By.CssSelector("form[action='/v2/account/signIn'] button.forgot")).Text.Trim();
+            var forgot = T(By.CssSelector("form[action='/v2/account/signIn'] button.forgot"));
             soft.Contains("Forgot", I18n["SignIn"][$"{locale}.Forgot"], forgot);
 
-            // No account? + Sign up
-            var noAcc = root.FindElement(By.CssSelector("form[action='/v2/account/signIn'] .cta-bottom p")).Text.Trim();
+            // No account?
+            var noAcc = T(By.CssSelector("form[action='/v2/account/signIn'] .cta-bottom p"));
             soft.Contains("NoAcc", I18n["SignIn"][$"{locale}.NoAcc"], noAcc);
 
-            var signUpLink = root.FindElement(By.CssSelector("form[action='/v2/account/signIn'] .cta-bottom button[aria-label*='Sign up' i]")).Text.Trim();
+            // Sign up
+            var signUpLink = T(By.CssSelector("form[action='/v2/account/signIn'] .cta-bottom button[aria-label*='Sign up' i]"));
             soft.Contains("SignUpLink", I18n["SignIn"][$"{locale}.SignUpLink"], signUpLink);
 
-            // Submit (в вёрстке — "Submit"; допускаем "Sign In" из словаря)
-            var submitText = root.FindElement(By.CssSelector("form[action='/v2/account/signIn'] button[type='submit'] .btn-text")).Text.Trim();
+            // Submit (в разметке — "Submit"; допускаем "Sign In" из словаря)
+            var submitText = T(By.CssSelector("form[action='/v2/account/signIn'] button[type='submit'] .btn-text"));
             var expectedBtn = I18n["SignIn"][$"{locale}.SignInBtn"];
             if (!(SoftEquals(expectedBtn, submitText) || SoftEquals("Submit", submitText)))
                 soft.Contains("Button", expectedBtn, submitText);
@@ -407,7 +487,7 @@ namespace AtasLocalizationTests
             try { new Actions(_driver).SendKeys(Keys.Escape).Perform(); } catch { }
         }
 
-        // -------- Soft assertions --------
+        // -------- Soft assertions: копит ВСЕ ошибки и роняет тест только в конце --------
         private sealed class SoftVerify
         {
             private readonly List<string> _errors = new();
@@ -450,4 +530,3 @@ namespace AtasLocalizationTests
         }
     }
 }
-
