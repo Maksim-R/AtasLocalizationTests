@@ -69,7 +69,7 @@ namespace AtasLocalizationTests
         public void Check_Signup_On_Locale(string locale)
         {
             var errors = new List<string>();
-            var page = new SignupPopupPage(_driver, _kit);
+            var page = new SignupPopupPage(_kit);
 
             // 1) Открыть сайт и выбрать локаль
             _driver.Navigate().GoToUrl(RootUrl);

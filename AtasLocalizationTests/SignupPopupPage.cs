@@ -10,13 +10,11 @@ namespace AtasLocalizationTests
     /// Хранит локаторы и сценарии действий.
     /// </summary>
     public sealed class SignupPopupPage
-    {
-        private readonly IWebDriver _driver;
+    {        
         private readonly SeleniumKit _kit;
 
-        public SignupPopupPage(IWebDriver driver, SeleniumKit kit)
-        {
-            _driver = driver;
+        public SignupPopupPage(SeleniumKit kit)
+        {            
             _kit = kit;
         }
 
