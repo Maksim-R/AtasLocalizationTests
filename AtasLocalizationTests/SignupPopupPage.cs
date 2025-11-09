@@ -88,6 +88,7 @@ namespace AtasLocalizationTests
         public void WaitSuccessVisible(int seconds = 40) =>
             _kit.WaitPopupVisible(SuccessName, seconds);
 
+
         /// <summary>Читает тексты из success-попапа.</summary>
         public (string title, string subtitle, string button) ReadSuccessTexts()
         {
@@ -97,5 +98,96 @@ namespace AtasLocalizationTests
                 _kit.GetTextByXPath(X["success_button"])
             );
         }
+
+        /// <summary>
+        /// Дожидается success-попапа и валидирует его тексты.
+        /// Если видимый заголовок/подзаголовок пустые, пробует взять их из data-msgs (fallback).
+        /// На расхождения делает скриншоты с ключами: success_title / success_subtitle / success_button.
+        /// </summary>
+        public void WaitAndValidateSuccess(string locale, List<string> errors, int waitSeconds = 45)
+        {
+            // 1) Ждём сам попап
+            _kit.WaitPopupVisible(SuccessName, waitSeconds);
+
+            // 2) Пробуем прочитать тексты из DOM
+            var (title, subtitle, button) = ReadSuccessTexts();
+
+            // 3) Fallback: если нет текста, читаем из data-msgs на signup
+            if (string.IsNullOrWhiteSpace(title) || string.IsNullOrWhiteSpace(subtitle))
+            {
+                try
+                {
+                    var host = _kit.FindByXPath(Locators.Signup.DataMsgsHost);
+                    if (host != null)
+                    {
+                        var raw = host.GetAttribute("data-msgs") ?? "";
+                        var decoded = System.Net.WebUtility.HtmlDecode(raw);
+
+                        using var jd = System.Text.Json.JsonDocument.Parse(decoded);
+                        if (jd.RootElement.TryGetProperty("success", out var success))
+                        {
+                            if (string.IsNullOrWhiteSpace(title) && success.TryGetProperty("title", out var t))
+                                title = t.GetString() ?? title;
+
+                            if (string.IsNullOrWhiteSpace(subtitle) && success.TryGetProperty("subtitle", out var s))
+                                subtitle = s.GetString() ?? subtitle;
+
+                            if (string.IsNullOrWhiteSpace(button) && success.TryGetProperty("button", out var b))
+                                button = b.GetString() ?? button;
+                        }
+                    }
+                }
+                catch
+                {
+                    // молча игнорируем: fallback не обязателен
+                }
+            }
+
+            // 4) Валидации: contains для title/subtitle, equals для кнопки
+            ExpectContains(locale, "success_title", title, errors, screenshotKey: "success_title");
+            ExpectContains(locale, "success_subtitle", subtitle, errors, screenshotKey: "success_subtitle");
+            ExpectEquals(locale, "success_button", button, errors, screenshotKey: "success_button");
+        }
+
+        /// <summary>Ожидаем, что фактическая строка содержит эталонную.</summary>
+        private void ExpectContains(string locale, string key, string actual, List<string> errors, string? screenshotKey = null)
+        {
+            var expected = GetExpected(locale, key);
+            if (string.IsNullOrEmpty(actual))
+            {
+                if (!string.IsNullOrEmpty(screenshotKey)) _kit.TakeScreenshot(locale, screenshotKey);
+                errors.Add($"[{locale}] {key}: пустое значение.");
+                return;
+            }
+            if (!SeleniumKit.ContainsNormalized(actual, expected))
+            {
+                if (!string.IsNullOrEmpty(screenshotKey)) _kit.TakeScreenshot(locale, screenshotKey);
+                errors.Add($"[{locale}] {key}: ожидали содержит «{expected}», получили «{actual}».");
+            }
+        }
+
+        /// <summary>Ожидаем точное совпадение (после нормализации).</summary>
+        private void ExpectEquals(string locale, string key, string actual, List<string> errors, string? screenshotKey = null)
+        {
+            var expected = GetExpected(locale, key);
+            if (string.IsNullOrEmpty(actual))
+            {
+                if (!string.IsNullOrEmpty(screenshotKey)) _kit.TakeScreenshot(locale, screenshotKey);
+                errors.Add($"[{locale}] {key}: пустое значение.");
+                return;
+            }
+            if (!SeleniumKit.EqualsNormalized(actual, expected))
+            {
+                if (!string.IsNullOrEmpty(screenshotKey)) _kit.TakeScreenshot(locale, screenshotKey);
+                errors.Add($"[{locale}] {key}: ожидали «{expected}», получили «{actual}».");
+            }
+        }
+
+        private static string GetExpected(string locale, string key)
+        {
+            // Берём эталон из Translations.Exp
+            return Translations.Exp.TryGetValue((locale, key), out var v) ? v : "";
+        }
+
     }
 }

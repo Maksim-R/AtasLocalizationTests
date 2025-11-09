@@ -16,6 +16,8 @@
             public const string SubmitText = Root + "//div[@class='btn-text']";
             public const string BottomText = Root + "//div[contains(@class,'cta-bottom')]//p";
             public const string BottomCta = Root + "//div[contains(@class,'cta-bottom')]//button";
+            public const string DataMsgsHost = Root + "//div[contains(@class,'custom-form') and @data-msgs]";
+
         }
 
         // --- SUCCESS POPUP ---

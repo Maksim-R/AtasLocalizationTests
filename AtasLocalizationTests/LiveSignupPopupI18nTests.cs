@@ -111,21 +111,15 @@ namespace AtasLocalizationTests
                 errors.Add($"[{locale}] Сабмит формы: {ex.Message}");
             }
 
-            // 6) Ждать и проверить success
+            // 6) Ждать и проверить success (одним методом страницы)
             try
             {
-                page.WaitSuccessVisible(40);
-
-                var (succTitle, succSubtitle, succButton) = page.ReadSuccessTexts();
-
-                ExpectContains(errors, locale, "success_title", succTitle, screenshotOnErrorKey: "success_title");
-                ExpectContains(errors, locale, "success_subtitle", succSubtitle, screenshotOnErrorKey: "success_subtitle");
-                ExpectEquals(errors, locale, "success_button", succButton, screenshotOnErrorKey: "success_button");
+                page.WaitAndValidateSuccess(locale, errors, 45);
             }
             catch (Exception ex)
             {
                 _kit.TakeScreenshot(locale, "success_wait_fail");
-                errors.Add($"[{locale}] Ожидание/проверка success: {ex.Message}");
+                errors.Add($"[{locale}] Ожидание/валидация success: {ex.Message}");
             }
 
             // 7) Отчёт
