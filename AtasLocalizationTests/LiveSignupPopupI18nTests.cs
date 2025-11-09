@@ -95,22 +95,8 @@ namespace AtasLocalizationTests
             ["success_button"] = "//div[@data-popup-name='success']//button[contains(@class,'btn') and contains(@class,'cta')]"
         };
 
-        // Эталонные строки по локалям
         private readonly Dictionary<(string locale, string key), string> _exp = new TupleIgnoreCaseDictionary
         {
-            // EN
-            { ("EN","title"),            "Sign Up" },
-            { ("EN","email_label"),      "Email" },
-            { ("EN","email_ph"),         "We’ll send your ATAS password to this email address" },
-            { ("EN","marketing"),        "I would like to receive special offers from ATAS" },
-            { ("EN","agree"),            "Please read and accept the Terms of Use and License Agreement" },
-            { ("EN","submit_text"),      "Sign Up" },
-            { ("EN","bottom_text"),      "Already have an account?" },
-            { ("EN","bottom_cta"),       "Sign In" },
-            { ("EN","success_title"),    "Thanks for signing up!" },
-            { ("EN","success_subtitle"), "Check your inbox — we’ve sent you an email with an activation link." },
-            { ("EN","success_button"),   "Close" },
-
             // RU
             { ("RU","title"),            "Регистрация" },
             { ("RU","email_label"),      "Email" },
@@ -124,6 +110,19 @@ namespace AtasLocalizationTests
             { ("RU","success_subtitle"), "Проверь почту — мы отправили письмо со ссылкой для активации аккаунта." },
             { ("RU","success_button"),   "Закрыть" },
 
+            // EN
+            { ("EN","title"),            "Sign Up" },
+            { ("EN","email_label"),      "Email" },
+            { ("EN","email_ph"),         "We’ll send your ATAS password to this email address" },
+            { ("EN","marketing"),        "I would like to receive special offers from ATAS" },
+            { ("EN","agree"),            "Please read and accept the Terms of Use and License Agreement" },
+            { ("EN","submit_text"),      "Sign Up" },
+            { ("EN","bottom_text"),      "Already have an account?" },
+            { ("EN","bottom_cta"),       "Sign In" },
+            { ("EN","success_title"),    "Thanks for signing up!" },
+            { ("EN","success_subtitle"), "Check your inbox — we’ve sent you an email with an activation link." },
+            { ("EN","success_button"),   "Close" },
+
             // DE
             { ("DE","title"),            "Registrierung" },
             { ("DE","email_label"),      "Email" },
@@ -134,7 +133,7 @@ namespace AtasLocalizationTests
             { ("DE","bottom_text"),      "Hast du schon ein Konto?" },
             { ("DE","bottom_cta"),       "Anmelden" },
             { ("DE","success_title"),    "Danke für deine Registrierung!" },
-            { ("DE","success_subtitle"), "Überprüfe dein Postfach – мы haben dir eine E-Mail mit einem Aktivierungslink geschickt." },
+            { ("DE","success_subtitle"), "Überprüfe dein Postfach – wir haben dir eine E-Mail mit einem Aktivierungslink geschickt." },
             { ("DE","success_button"),   "Schließen" },
 
             // ES
@@ -153,14 +152,14 @@ namespace AtasLocalizationTests
             // FR
             { ("FR","title"),            "Inscription" },
             { ("FR","email_label"),      "Email" },
-            { ("FR","email_ph"),         "Saisissez votre adresse e-mail" },
+            { ("FR","email_ph"),         "Saisissez votre adresse e-mail (Nous vous enverrons votre mot de passe ATAS à cette adresse e-mail)" },
             { ("FR","marketing"),        "Recevoir les actualités et offres d’ATAS" },
-            { ("FR","agree"),            "En t’inscrivant, tu acceptes les Terms of Use et le License Agreement" },
+            { ("FR","agree"),            "Veuillez lire et accepter les Conditions d'utilisation et le Contrat de licence." },
             { ("FR","submit_text"),      "S’inscrire" },
-            { ("FR","bottom_text"),      "Tu as déjà un compte ?" },
-            { ("FR","bottom_cta"),       "Connexion" },
-            { ("FR","success_title"),    "Merci pour ton inscription !" },
-            { ("FR","success_subtitle"), "Vérifie ta boîte mail — nous t’avons envoyé un e-mail avec un lien d’activation." },
+            { ("FR","bottom_text"),      "Vous avez déjà un compte ?" },
+            { ("FR","bottom_cta"),       "Se connecter" },
+            { ("FR","success_title"),    "Merci pour votre inscription !" },
+            { ("FR","success_subtitle"), "Vérifiez votre boîte de réception — nous vous avons envoyé un e-mail contenant un lien d'activation." },
             { ("FR","success_button"),   "Fermer" },
 
             // IT
@@ -186,7 +185,7 @@ namespace AtasLocalizationTests
             { ("UA","bottom_text"),      "Уже маєш акаунт?" },
             { ("UA","bottom_cta"),       "Увійти" },
             { ("UA","success_title"),    "Дякуємо за реєстрацію!" },
-            { ("UA","success_subtitle"), "Перевір пошту — ми надіслали лист із посиланням для активации акаунта." },
+            { ("UA","success_subtitle"), "Перевір пошту — ми надіслали лист із посиланням для активації акаунта." },
             { ("UA","success_button"),   "Закрити" },
 
             // CN
@@ -202,6 +201,7 @@ namespace AtasLocalizationTests
             { ("CN","success_subtitle"), "请查看邮箱，我们已发送激活链接。" },
             { ("CN","success_button"),   "关闭" },
         };
+
 
         private static readonly string[] Locales = { "EN", "RU", "FR", "DE", "IT", "ES", "UA", "CN" };
 
