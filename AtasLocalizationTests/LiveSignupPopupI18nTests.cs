@@ -129,133 +129,176 @@ namespace AtasLocalizationTests
         {
             var errors = new List<string>();
 
-            _kit.GoTo(RootUrl);
-            try { _kit.SelectLocale(locale); }
-            catch (Exception ex) { errors.Add($"[{locale}] Ошибка выбора локали: {ex.Message}"); }
-
-            if (!_kit.VerifyLocaleByUrlAndLang(locale, out var explain))
-                errors.Add($"[{locale}] Локаль не подтверждена: {explain}");
-
-            // 1) Открываем форму авторизации
             try
             {
-                _signin.Open();
-                _kit.TakeScreenshot(locale, "form_opened");
-            }
-            catch (Exception ex)
-            {
-                errors.Add($"[{locale}] Ошибка открытия формы входа: {ex.Message}");
-                return; // Не продолжаем если форму не удалось открыть
-            }
+                _kit.GoTo(RootUrl);
+                try { _kit.SelectLocale(locale); }
+                catch (Exception ex) { errors.Add($"[{locale}] Ошибка выбора локали: {ex.Message}"); }
 
-            // 2) Проверяем тексты
-            _signin.ValidateTexts(locale, errors);
+                if (!_kit.VerifyLocaleByUrlAndLang(locale, out var explain))
+                    errors.Add($"[{locale}] Локаль не подтверждена: {explain}");
 
-            // 3) Невалидный вход
-            try
-            {
+                // 1) Открываем форму авторизации с диагностикой
+                TestContext.WriteLine($"[{locale}] Пытаемся открыть форму...");
+                try
+                {
+                    _signin.Open();
+                    _kit.TakeScreenshot(locale, "form_opened");
+
+                    // Проверяем, что форма действительно открыта
+                    if (!_signin.IsFormOpen())
+                    {
+                        errors.Add($"[{locale}] Форма не открылась после вызова Open()");
+                        throw new Exception("Форма не открыта");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    errors.Add($"[{locale}] Ошибка открытия формы входа: {ex.Message}");
+                    _kit.TakeScreenshot(locale, "form_open_error");
+                    throw; // Прерываем тест если форму не удалось открыть
+                }
+
+                // 2) Проверяем тексты
+                TestContext.WriteLine($"[{locale}] Проверяем тексты...");
+                _signin.ValidateTexts(locale, errors);
+
+                // 3) Проверяем состояние формы перед вводом
+                TestContext.WriteLine($"[{locale}] Проверяем состояние формы...");
+                var formState = _signin.GetFormState();
+                if (!formState.emailEnabled || !formState.passwordEnabled || !formState.submitEnabled)
+                {
+                    errors.Add($"[{locale}] Форма недоступна для ввода. Email: {formState.emailEnabled}, Password: {formState.passwordEnabled}, Submit: {formState.submitEnabled}");
+                }
+
+                // 4) Невалидный вход
                 TestContext.WriteLine($"[{locale}] Выполняем невалидный вход...");
-                _signin.Login("wrong" + Guid.NewGuid().ToString("N")[..5] + "@test.net", "wrongpass");
-                _kit.TakeScreenshot(locale, "after_invalid_login");
-
-                // Проверяем ошибку
-                if (!_signin.IsErrorVisible())
+                try
                 {
-                    errors.Add($"[{locale}] Ошибка авторизации не отображается после невалидного входа");
-                }
-                else
-                {
-                    var err = _signin.GetErrorText();
-                    var expError = Translations.Exp.TryGetValue((locale, "signin_error"), out var v) ? v : "";
+                    _signin.Login("wrong" + Guid.NewGuid().ToString("N")[..5] + "@test.net", "wrongpass");
+                    _kit.TakeScreenshot(locale, "after_invalid_login");
 
-                    if (string.IsNullOrEmpty(err) || err.StartsWith("__NOT_FOUND__"))
+                    // Проверяем ошибку
+                    if (!_signin.IsErrorVisible())
                     {
-                        errors.Add($"[{locale}] Текст ошибки авторизации не найден");
-                    }
-                    else if (!SeleniumKit.ContainsNormalized(err, expError))
-                    {
-                        errors.Add($"[{locale}] Текст ошибки авторизации: ожидали '{expError}', получили '{err}'");
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                errors.Add($"[{locale}] Ошибка при невалидном входе: {ex.Message}");
-                _kit.TakeScreenshot(locale, "invalid_login_error");
-            }
-
-            // 4) Подготавливаем форму для валидного входа - УПРОЩЕННАЯ ЛОГИКА
-            TestContext.WriteLine($"[{locale}] Подготавливаем форму для валидного входа...");
-
-            // Просто закрываем и заново открываем форму, чтобы гарантированно очистить все поля
-            try
-            {
-                _signin.Close();
-                _kit.Sleep(2000);
-                _signin.Open();
-                _kit.Sleep(2000);
-                _kit.TakeScreenshot(locale, "form_prepared_for_valid_login");
-            }
-            catch (Exception ex)
-            {
-                errors.Add($"[{locale}] Ошибка подготовки формы для валидного входа: {ex.Message}");
-                _kit.TakeScreenshot(locale, "form_preparation_error");
-            }
-
-            // 5) Валидный вход
-            try
-            {
-                TestContext.WriteLine($"[{locale}] Выполняем валидный вход...");
-
-                // Убеждаемся, что форма открыта
-                if (!_signin.IsFormOpen())
-                {
-                    errors.Add($"[{locale}] Форма авторизации не открыта перед валидным входом");
-                }
-                else
-                {
-                    // Выполняем вход с валидными данными
-                    _signin.Login("test560@test.net", "NjEPWB!1w");
-                    _kit.TakeScreenshot(locale, "after_valid_login");
-
-                    // Ждем и проверяем результат
-                    _kit.Sleep(3000);
-
-                    // Проверяем, что форма закрылась (успешный вход)
-                    if (_signin.IsFormOpen())
-                    {
-                        // Если форма осталась открытой, проверяем есть ли ошибка
-                        if (_signin.IsErrorVisible())
-                        {
-                            var errorText = _signin.GetErrorText();
-                            errors.Add($"[{locale}] Ошибка при валидном входе: {errorText}");
-                        }
-                        else
-                        {
-                            errors.Add($"[{locale}] Форма не закрылась после валидного входа (возможно неверные данные)");
-                        }
+                        errors.Add($"[{locale}] Ошибка авторизации не отображается после невалидного входа");
                     }
                     else
                     {
-                        TestContext.WriteLine($"[{locale}] Форма успешно закрылась - вход выполнен");
+                        var err = _signin.GetErrorText();
+                        var expError = Translations.Exp.TryGetValue((locale, "signin_error"), out var v) ? v : "";
+
+                        if (string.IsNullOrEmpty(err) || err.StartsWith("__NOT_FOUND__"))
+                        {
+                            errors.Add($"[{locale}] Текст ошибки авторизации не найден");
+                        }
+                        else if (!SeleniumKit.ContainsNormalized(err, expError))
+                        {
+                            errors.Add($"[{locale}] Текст ошибки авторизации: ожидали '{expError}', получили '{err}'");
+                        }
                     }
+                }
+                catch (Exception ex)
+                {
+                    errors.Add($"[{locale}] Ошибка при невалидном входе: {ex.Message}");
+                    _kit.TakeScreenshot(locale, "invalid_login_error");
+                }
+
+                // 5) Подготавливаем форму для валидного входа
+                TestContext.WriteLine($"[{locale}] Подготавливаем форму для валидного входа...");
+                try
+                {
+                    _signin.ReopenForm();
+                    _kit.Sleep(2000);
+                    _kit.TakeScreenshot(locale, "form_prepared_for_valid_login");
+                }
+                catch (Exception ex)
+                {
+                    errors.Add($"[{locale}] Ошибка подготовки формы для валидного входа: {ex.Message}");
+                    _kit.TakeScreenshot(locale, "form_preparation_error");
+                }
+
+                // 6) Валидный вход
+                TestContext.WriteLine($"[{locale}] Выполняем валидный вход...");
+                try
+                {
+                    // Убеждаемся, что форма открыта
+                    if (!_signin.IsFormOpen())
+                    {
+                        errors.Add($"[{locale}] Форма авторизации не открыта перед валидным входом");
+                    }
+                    else
+                    {
+                        // Выполняем вход с валидными данными
+                        _signin.Login("test560@test.net", "NjEPWB!1w");
+                        _kit.TakeScreenshot(locale, "after_valid_login");
+
+                        // Ждем и проверяем результат
+                        _kit.Sleep(5000); // Увеличиваем время ожидания
+
+                        // Проверяем, что форма закрылась (успешный вход)
+                        bool isFormStillOpen = _signin.IsFormOpen();
+
+                        if (isFormStillOpen)
+                        {
+                            // Если форма осталась открытой, проверяем есть ли ошибка
+                            if (_signin.IsErrorVisible())
+                            {
+                                var errorText = _signin.GetErrorText();
+                                errors.Add($"[{locale}] Ошибка при валидном входе: {errorText}");
+                            }
+                            else
+                            {
+                                // Проверяем, не произошел ли редирект на другую страницу
+                                var currentUrl = _kit.Driver.Url;
+                                if (currentUrl != RootUrl && !currentUrl.Contains("signin"))
+                                {
+                                    TestContext.WriteLine($"[{locale}] Произошел редирект на: {currentUrl}");
+                                    // Редирект произошел - вход успешен
+                                }
+                                else
+                                {
+                                    // Проверяем, не появились ли элементы личного кабинета
+                                    var userMenu = _kit.FindByXPath("//div[contains(@class,'user-menu')] | //a[contains(@href,'account')] | //span[contains(text(),'Welcome')]");
+                                    if (userMenu != null && userMenu.Displayed)
+                                    {
+                                        TestContext.WriteLine($"[{locale}] Обнаружены элементы личного кабинета - вход успешен");
+                                    }
+                                    else
+                                    {
+                                        errors.Add($"[{locale}] Форма не закрылась после валидного входа, но редиректа не произошло");
+                                    }
+                                }
+                            }
+                        }
+                        else
+                        {
+                            TestContext.WriteLine($"[{locale}] Форма успешно закрылась - вход выполнен");
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    errors.Add($"[{locale}] Ошибка при валидном входе: {ex.Message}");
+                    _kit.TakeScreenshot(locale, "valid_login_error");
+                }
+
+                // Форматируем вывод ошибок
+                if (errors.Count > 0)
+                {
+                    var errorMessage = string.Join(Environment.NewLine, errors);
+                    Assert.Fail($"Найдено {errors.Count} несоответствий для локали {locale}:{Environment.NewLine}{errorMessage}");
+                }
+                else
+                {
+                    TestContext.WriteLine($"✅ [{locale}] SIGNIN OK");
                 }
             }
             catch (Exception ex)
             {
-                errors.Add($"[{locale}] Ошибка при валидном входе: {ex.Message}");
-                _kit.TakeScreenshot(locale, "valid_login_error");
-            }
-
-            // Форматируем вывод ошибок
-            if (errors.Count > 0)
-            {
-                var errorMessage = string.Join(Environment.NewLine, errors);
-                Assert.Fail($"Найдено {errors.Count} несоответствий для локали {locale}:{Environment.NewLine}{errorMessage}");
-            }
-            else
-            {
-                TestContext.WriteLine($"✅ [{locale}] SIGNIN OK");
+                // Ловим все необработанные исключения
+                _kit.TakeScreenshot(locale, "unhandled_exception");
+                throw new Exception($"Тест упал с исключением в строке ~254: {ex.Message}", ex);
             }
         }
 

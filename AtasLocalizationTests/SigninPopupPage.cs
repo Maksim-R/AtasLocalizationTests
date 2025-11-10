@@ -254,16 +254,43 @@ namespace AtasLocalizationTests
         }
 
         /// <summary>Проверяет состояние формы авторизации.</summary>
-        public (bool emailEnabled, bool passwordEnabled, bool submitEnabled) GetFormState()
+        public (bool emailEnabled, bool passwordEnabled, bool submitEnabled, bool submitVisible) GetFormState()
         {
             var emailInput = _kit.FindByXPath(X["email_input"]);
             var passInput = _kit.FindByXPath(X["password_input"]);
             var submitBtn = _kit.FindByXPath(X["submit_btn"]);
 
+            bool IsElementEnabled(IWebElement? element)
+            {
+                if (element is null) return false;
+                try
+                {
+                    return element.Enabled && element.Displayed;
+                }
+                catch
+                {
+                    return false;
+                }
+            }
+
+            bool IsElementVisible(IWebElement? element)
+            {
+                if (element is null) return false;
+                try
+                {
+                    return element.Displayed;
+                }
+                catch
+                {
+                    return false;
+                }
+            }
+
             return (
-                emailEnabled: emailInput?.Enabled ?? false,
-                passwordEnabled: passInput?.Enabled ?? false,
-                submitEnabled: submitBtn?.Enabled ?? false
+                emailEnabled: IsElementEnabled(emailInput),
+                passwordEnabled: IsElementEnabled(passInput),
+                submitEnabled: IsElementEnabled(submitBtn),
+                submitVisible: IsElementVisible(submitBtn)
             );
         }
     }

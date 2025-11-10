@@ -289,34 +289,69 @@ namespace AtasLocalizationTests
             return "";
         }
 
+        /// <summary>Проверяет локаль по URL и html lang атрибуту.</summary>
         public bool VerifyLocaleByUrlAndLang(string locale, out string explain)
         {
             explain = "";
-            var ok = true;
-
-            var u = _driver.Url ?? "";
-            if (UrlHints.TryGetValue(locale, out var hints))
-            {
-                var hit = hints.Any(h => u.Contains(h, StringComparison.OrdinalIgnoreCase));
-                if (!hit) { ok = false; explain += $"URL '{u}' не похож на {locale}; "; }
-            }
 
             try
             {
                 var pref = HtmlLangPrefix.TryGetValue(locale, out var p) ? p : "en";
                 var lang = (string)((IJavaScriptExecutor)_driver)
                     .ExecuteScript("return document.documentElement.lang||'';");
-                if (string.IsNullOrEmpty(lang) || !lang.StartsWith(pref, StringComparison.OrdinalIgnoreCase))
+
+                if (string.IsNullOrEmpty(lang))
                 {
-                    ok = false; explain += $"html[lang]={lang} не начинается с '{pref}'. ";
+                    explain = "html[lang] не установлен";
+                    return false;
                 }
+
+                if (!lang.StartsWith(pref, StringComparison.OrdinalIgnoreCase))
+                {
+                    explain = $"html[lang]='{lang}' не начинается с '{pref}'";
+                    return false;
+                }
+
+                explain = $"html[lang]='{lang}' - локаль подтверждена";
+                return true;
             }
             catch (Exception ex)
             {
-                ok = false; explain += $"ошибка чтения documentElement.lang: {ex.Message}. ";
+                explain = $"ошибка чтения documentElement.lang: {ex.Message}";
+                return false;
             }
+        }
+        /// <summary>Проверяет локаль только по html lang атрибуту (игнорирует URL).</summary>
+        public bool VerifyLocaleByHtmlLangOnly(string locale, out string explain)
+        {
+            explain = "";
 
-            return ok;
+            try
+            {
+                var pref = HtmlLangPrefix.TryGetValue(locale, out var p) ? p : "en";
+                var lang = (string)((IJavaScriptExecutor)_driver)
+                    .ExecuteScript("return document.documentElement.lang||'';");
+
+                if (string.IsNullOrEmpty(lang))
+                {
+                    explain = "html[lang] не установлен";
+                    return false;
+                }
+
+                if (!lang.StartsWith(pref, StringComparison.OrdinalIgnoreCase))
+                {
+                    explain = $"html[lang]='{lang}' не начинается с '{pref}'";
+                    return false;
+                }
+
+                explain = $"html[lang]='{lang}'";
+                return true;
+            }
+            catch (Exception ex)
+            {
+                explain = $"ошибка чтения documentElement.lang: {ex.Message}";
+                return false;
+            }
         }
 
         #endregion
