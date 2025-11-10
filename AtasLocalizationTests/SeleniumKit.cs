@@ -5,24 +5,58 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using NUnit.Framework;
 using OpenQA.Selenium;
+using OpenQA.Selenium.Chrome;
 using OpenQA.Selenium.Support.UI;
 
 namespace AtasLocalizationTests
 {
     /// <summary>
     /// Общие утилиты для Selenium: ожидания, клики, чтение текстов, локаль, скриншоты.
-    /// Ничего не знает о конкретных попапах.
     /// </summary>
-    public sealed class SeleniumKit
+    public sealed class SeleniumKit : IDisposable
     {
         private readonly IWebDriver _driver;
         private readonly WebDriverWait _wait;
+
+        public SeleniumKit()
+        {
+            var opts = new ChromeOptions();
+            opts.AddArgument("--disable-gpu");
+            opts.AddArgument("--disable-dev-shm-usage");
+            opts.AddArgument("--no-sandbox");
+            opts.AddArgument("--remote-allow-origins=*");
+
+            var service = ChromeDriverService.CreateDefaultService();
+            service.EnableVerboseLogging = true;
+            service.LogPath = Path.Combine(TestContext.CurrentContext.WorkDirectory, "chromedriver.log");
+
+            _driver = new ChromeDriver(service, opts, TimeSpan.FromSeconds(60));
+            _wait = new WebDriverWait(_driver, TimeSpan.FromSeconds(20));
+        }
 
         public SeleniumKit(IWebDriver driver, WebDriverWait wait)
         {
             _driver = driver;
             _wait = wait;
         }
+
+        public IWebDriver Driver => _driver;
+
+        #region Базовые методы навигации
+
+        public void GoTo(string url)
+        {
+            _driver.Navigate().GoToUrl(url);
+            WaitReady();
+        }
+
+        public void Dispose()
+        {
+            try { _driver?.Quit(); } catch { }
+            try { _driver?.Dispose(); } catch { }
+        }
+
+        #endregion
 
         #region Поиск/чтение/клики
 
@@ -51,8 +85,35 @@ namespace AtasLocalizationTests
 
         public void SafeClick(IWebElement el)
         {
-            try { el.Click(); }
-            catch { ((IJavaScriptExecutor)_driver).ExecuteScript("arguments[0].click();", el); }
+            try
+            {
+                el.Click();
+                return;
+            }
+            catch
+            {
+                try
+                {
+                    ((IJavaScriptExecutor)_driver).ExecuteScript(
+                        "if (arguments[0]) { arguments[0].click(); }", el);
+                    return;
+                }
+                catch
+                {
+                    try
+                    {
+                        var rect = (Dictionary<string, object>)((IJavaScriptExecutor)_driver)
+                            .ExecuteScript("if(!arguments[0]) return null; const r=arguments[0].getBoundingClientRect(); return {x:r.left+r.width/2,y:r.top+r.height/2};", el);
+                        if (rect != null)
+                        {
+                            ((IJavaScriptExecutor)_driver).ExecuteScript(
+                                "document.elementFromPoint(arguments[0], arguments[1])?.click();",
+                                rect["x"], rect["y"]);
+                        }
+                    }
+                    catch { /* глушим, чтобы не сыпать stacktrace */ }
+                }
+            }
         }
 
         public void JsClick(IWebElement el) =>
@@ -94,7 +155,7 @@ namespace AtasLocalizationTests
         }
 
         public static bool ContainsNormalized(string actual, string expectedPart) =>
-            Normalize(actual).IndexOf(Normalize(expectedPart), StringComparison.OrdinalIgnoreCase) >= 0;
+            Normalize(actual).Contains(Normalize(expectedPart), StringComparison.OrdinalIgnoreCase);
 
         public static bool EqualsNormalized(string a, string b) =>
             string.Equals(Normalize(a), Normalize(b), StringComparison.Ordinal);
@@ -236,7 +297,7 @@ namespace AtasLocalizationTests
             var u = _driver.Url ?? "";
             if (UrlHints.TryGetValue(locale, out var hints))
             {
-                var hit = hints.Any(h => u.IndexOf(h, StringComparison.OrdinalIgnoreCase) >= 0);
+                var hit = hints.Any(h => u.Contains(h, StringComparison.OrdinalIgnoreCase));
                 if (!hit) { ok = false; explain += $"URL '{u}' не похож на {locale}; "; }
             }
 
@@ -322,7 +383,6 @@ namespace AtasLocalizationTests
         {
             try
             {
-                // Создаем папку Screenshots если её нет
                 var screenshotsDir = Path.Combine(TestContext.CurrentContext.WorkDirectory, "Screenshots");
                 Directory.CreateDirectory(screenshotsDir);
 
@@ -333,18 +393,55 @@ namespace AtasLocalizationTests
                 var bytes = screenshot.AsByteArray;
                 File.WriteAllBytes(fullPath, bytes);
 
-                // Создаем относительный путь для ссылки
                 var relativePath = Path.Combine("Screenshots", fileName).Replace("\\", "/");
-
-                // Используем TestContext.AddTestAttachment для автоматического создания ссылок
                 TestContext.AddTestAttachment(fullPath, $"Скриншот {locale}_{key}");
 
-                // Дополнительное сообщение с красивым форматом
                 TestContext.WriteLine($"📸 Скриншот сохранён: <a href='{relativePath}' style='color: #007bff; text-decoration: underline;'>{fileName}</a>");
             }
             catch (Exception ex)
             {
                 TestContext.WriteLine($"⚠️ Не удалось сделать скриншот: {ex.Message}");
+            }
+        }
+
+        #endregion
+
+        #region Дополнительные методы для совместимости
+
+        public void ClickByCss(string cssSelector)
+        {
+            var element = _wait.Until(d => d.FindElement(By.CssSelector(cssSelector)));
+            SafeClick(element);
+        }
+
+        public void ForceOpenPopup(string popupName)
+        {
+            ((IJavaScriptExecutor)_driver).ExecuteScript(@"
+                const p = document.querySelector(`div.popup[data-popup-name='`+arguments[0]+`']`);
+                if (p) { 
+                    p.classList.add('active'); 
+                    p.style.display='block';
+                }
+            ", popupName);
+            Sleep(150);
+        }
+
+        /// <summary>Устанавливает значение элемента через JavaScript.</summary>
+        public void JsSetValue(IWebElement element, string value)
+        {
+            try
+            {
+                ((IJavaScriptExecutor)_driver).ExecuteScript("arguments[0].value = arguments[1];", element, value);
+            }
+            catch (Exception ex)
+            {
+                TestContext.WriteLine($"⚠️ Не удалось установить значение через JS: {ex.Message}");
+                // Пробуем обычный способ как fallback
+                element.Clear();
+                if (!string.IsNullOrEmpty(value))
+                {
+                    element.SendKeys(value);
+                }
             }
         }
 

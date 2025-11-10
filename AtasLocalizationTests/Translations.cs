@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 
 namespace AtasLocalizationTests
 {
@@ -112,6 +113,88 @@ namespace AtasLocalizationTests
             { ("CN","success_title"),    "感谢您的注册！" },
             { ("CN","success_subtitle"), "请查看邮箱，我们已发送激活链接。" },
             { ("CN","success_button"),   "关闭" },
+
+            // --- Signin popup translations ---
+            { ("RU", "signin_title"), "Вход" },
+            { ("EN", "signin_title"), "Sign In" },
+            { ("DE", "signin_title"), "Anmeldung" },
+            { ("ES", "signin_title"), "Iniciar sesión" },
+            { ("FR", "signin_title"), "Connexion" },
+            { ("IT", "signin_title"), "Accesso" },
+            { ("UA", "signin_title"), "Вхід" },
+            { ("CN", "signin_title"), "登录" },
+
+            { ("RU", "signin_email_ph"), "Email (на него придет пароль от ATAS)" },
+            { ("EN", "signin_email_ph"), "Enter your email" },
+            { ("DE", "signin_email_ph"), "E-Mail-Adresse eingeben" },
+            { ("ES", "signin_email_ph"), "Introduce tu correo electrónico" },
+            { ("FR", "signin_email_ph"), "Saisissez votre adresse e-mail" },
+            { ("IT", "signin_email_ph"), "Inserisci il tuo indirizzo e-mail" },
+            { ("UA", "signin_email_ph"), "Введи свій email" },
+            { ("CN", "signin_email_ph"), "请输入您的邮箱地址" },
+
+            { ("RU", "signin_pass_label"), "Пароль" },
+            { ("EN", "signin_pass_label"), "Password" },
+            { ("DE", "signin_pass_label"), "Passwort" },
+            { ("ES", "signin_pass_label"), "Contraseña" },
+            { ("FR", "signin_pass_label"), "Mot de passe" },
+            { ("IT", "signin_pass_label"), "Password" },
+            { ("UA", "signin_pass_label"), "Пароль" },
+            { ("CN", "signin_pass_label"), "密码" },
+
+            { ("RU", "signin_pass_ph"), "Введи свой пароль" },
+            { ("EN", "signin_pass_ph"), "Enter your password" },
+            { ("DE", "signin_pass_ph"), "Passwort eingeben" },
+            { ("ES", "signin_pass_ph"), "Introduce tu contraseña" },
+            { ("FR", "signin_pass_ph"), "Saisissez votre mot de passe" },
+            { ("IT", "signin_pass_ph"), "Inserisci la tua password" },
+            { ("UA", "signin_pass_ph"), "Введи свій пароль" },
+            { ("CN", "signin_pass_ph"), "请输入密码" },
+
+            { ("RU", "signin_forgot"), "Забыл(а) пароль?" },
+            { ("EN", "signin_forgot"), "Forgot your password?" },
+            { ("DE", "signin_forgot"), "Passwort vergessen?" },
+            { ("ES", "signin_forgot"), "¿Olvidaste tu contraseña?" },
+            { ("FR", "signin_forgot"), "Mot de passe oublié ?" },
+            { ("IT", "signin_forgot"), "Hai dimenticato la password?" },
+            { ("UA", "signin_forgot"), "Забули пароль?" },
+            { ("CN", "signin_forgot"), "忘记密码？" },
+
+            { ("RU", "signin_submit"), "Войти" },
+            { ("EN", "signin_submit"), "Sign In" },
+            { ("DE", "signin_submit"), "Anmelden" },
+            { ("ES", "signin_submit"), "Acceder" },
+            { ("FR", "signin_submit"), "Se connecter" },
+            { ("IT", "signin_submit"), "Accedi" },
+            { ("UA", "signin_submit"), "Увійти" },
+            { ("CN", "signin_submit"), "登录" },
+
+            { ("RU", "signin_bottom_text"), "Нет учетной записи?" },
+            { ("EN", "signin_bottom_text"), "No account?" },
+            { ("DE", "signin_bottom_text"), "Noch kein Konto?" },
+            { ("ES", "signin_bottom_text"), "¿No tienes cuenta?" },
+            { ("FR", "signin_bottom_text"), "Pas de compte ?" },
+            { ("IT", "signin_bottom_text"), "Non hai un account?" },
+            { ("UA", "signin_bottom_text"), "Немає облікового запису?" },
+            { ("CN", "signin_bottom_text"), "没有账号？" },
+
+            { ("RU", "signin_bottom_cta"), "Зарегистрироваться" },
+            { ("EN", "signin_bottom_cta"), "Sign up" },
+            { ("DE", "signin_bottom_cta"), "Registrieren" },
+            { ("ES", "signin_bottom_cta"), "Registrarse" },
+            { ("FR", "signin_bottom_cta"), "S’inscrire" },
+            { ("IT", "signin_bottom_cta"), "Registrati" },
+            { ("UA", "signin_bottom_cta"), "Зареєструватися" },
+            { ("CN", "signin_bottom_cta"), "注册" },
+
+            { ("RU", "signin_error"), "Неверный логин или пароль!" },
+            { ("EN", "signin_error"), "Invalid username or password!" },
+            { ("DE", "signin_error"), "Ungültiger Benutzername oder Passwort!" },
+            { ("ES", "signin_error"), "¡Nombre de usuario o contraseña incorrectos!" },
+            { ("FR", "signin_error"), "Nom d'utilisateur ou mot de passe invalide !" },
+            { ("IT", "signin_error"), "Nome utente o password non validi!" },
+            { ("UA", "signin_error"), "Невірний логін або пароль!" },
+            { ("CN", "signin_error"), "用户名或密码无效！" },
         };
     }
 

@@ -32,7 +32,7 @@ namespace AtasLocalizationTests
             ["agree_label"] = "//div[@data-popup-name='signup']//label[@class='checkbox'][2]//span[last()]",
             ["agree_checkbox"] = "//div[@data-popup-name='signup']//input[@type='checkbox' and @name='agree']",
             ["submit_text"] = "//div[@data-popup-name='signup']//div[@class='btn-text']",
-            ["submit_button"] = "//div[@data-popup-name='signup']//button[contains(@class,'btn') and contains(@class,'cta')]",
+            ["submit_button"] = "//div[@data-popup-name='signup']//form//button[@type='submit']",
             ["bottom_text"] = "//div[@data-popup-name='signup']//div[contains(@class,'cta-bottom')]//p",
             ["bottom_cta"] = "//div[@data-popup-name='signup']//div[contains(@class,'cta-bottom')]//button",
             ["data_msgs_host"] = "//div[@data-popup-name='signup']//div[contains(@class,'custom-form') and @data-msgs]",
@@ -46,9 +46,36 @@ namespace AtasLocalizationTests
         /// <summary>Открывает signup: кликом по триггеру или форсированно.</summary>
         public void Open()
         {
-            _kit.OpenPopupByTriggerOrForce(SignupName,
-                "[data-open-popup='signup'], [data-open-popup='sign-up']");
+            // 1) честная попытка: клик по кнопке "Войти" в шапке
+            try
+            {
+                // селектор именно для хедера: <a class="header-log-in" href="#form-signin">
+                _kit.ClickByCss("a.header-log-in[href='#form-signin']");
+                _kit.WaitPopupVisible(Locators.Popups.Signin, 5);
+                return;
+            }
+            catch
+            {
+                // пойдём дальше
+            }
+
+            // 2) иногда на странице есть альтернативные триггеры
+            try
+            {
+                _kit.ClickByCss("[data-open-popup='signin']");
+                _kit.WaitPopupVisible(Locators.Popups.Signin, 5);
+                return;
+            }
+            catch
+            {
+                // пойдём дальше
+            }
+
+            // 3) форс-показ, если верстка шалит
+            _kit.ForceOpenPopup("signin");
+            _kit.WaitPopupVisible(Locators.Popups.Signin, 10);
         }
+
 
         /// <summary>Возвращает тексты видимых элементов signup.</summary>
         public (string title, string emailLabel, string emailPh,
@@ -187,6 +214,31 @@ namespace AtasLocalizationTests
         {
             // Берём эталон из Translations.Exp
             return Translations.Exp.TryGetValue((locale, key), out var v) ? v : "";
+        }
+
+        /// <summary>
+        /// Клик по кнопке "Close" в success-попапе.
+        /// </summary>
+        public void ClickCloseButton()
+        {
+            const string closeXPath = "//div[@data-popup-name='success']//button[contains(@class,'btn') and contains(@class,'cta')]";
+            try
+            {
+                var closeBtn = _kit.FindByXPath(closeXPath);
+                if (closeBtn == null)
+                {
+                    Console.WriteLine("⚠️ Кнопка Close не найдена.");
+                    return;
+                }
+
+                _kit.JsClick(closeBtn);
+                _kit.WaitReady();
+                Console.WriteLine("✅ Кнопка Close успешно нажата.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("❌ Ошибка при клике Close: " + ex.Message);
+            }
         }
 
     }
