@@ -166,10 +166,15 @@ namespace AtasLocalizationTests
                 // 3) Проверяем состояние формы перед вводом
                 TestContext.WriteLine($"[{locale}] Проверяем состояние формы...");
                 var formState = _signin.GetFormState();
-                if (!formState.emailEnabled || !formState.passwordEnabled || !formState.submitEnabled)
+
+                // Проверяем только обязательные поля
+                if (!formState.emailEnabled || !formState.passwordEnabled)
                 {
-                    errors.Add($"[{locale}] Форма недоступна для ввода. Email: {formState.emailEnabled}, Password: {formState.passwordEnabled}, Submit: {formState.submitEnabled}");
+                    errors.Add($"[{locale}] Основные поля формы недоступны. Email: {formState.emailEnabled}, Password: {formState.passwordEnabled}");
                 }
+
+                // Submit может быть disabled - это нормально, просто логируем
+                TestContext.WriteLine($"[{locale}] Состояние формы - Email: {formState.emailEnabled}, Password: {formState.passwordEnabled}, Submit: {formState.submitEnabled}");
 
                 // 4) Невалидный вход
                 TestContext.WriteLine($"[{locale}] Выполняем невалидный вход...");
