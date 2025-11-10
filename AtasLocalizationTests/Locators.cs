@@ -37,34 +37,6 @@
             public const string Links = "nav.langs-wrapper-dropdown a.link";
         }
 
-        //
-        public static class Signin
-        {
-            public const string Root = "//div[@data-popup-name='signin']";
 
-            public const string Title = Root + "//span[contains(@class,'title')]";
-
-            public const string Form = Root + "//form[@action='/v2/account/signIn' and @method='post']";
-
-            public const string ErrorLabel = Root + "//div[@class='error_label' and @data-error]";
-
-            public const string EmailLabel = Root + "//label[.//input[@type='email']]/span[contains(@class,'placeholder')]";
-            public const string EmailInput = Root + "//input[@type='email' and @name='email']";
-
-            public const string PasswordLabel = Root + "//label[.//input[@type='password']]/span[contains(@class,'placeholder')]";
-            public const string PasswordInput = Root + "//input[@type='password' and @name='password']";
-            public const string ShowPasswordButton = Root + "//button[contains(@class,'show-password')]";
-
-            public const string ForgotButton = Root + "//button[(contains(@class,'forgot') or @data-open-popup='reset')]";
-
-            public const string SubmitButton = Root + "//button[@type='submit' and contains(@class,'btn')]";
-            public const string SubmitText = SubmitButton + "//div[@class='btn-text']";
-
-            public const string BottomText = Root + "//div[contains(@class,'cta-bottom')]//p";
-            public const string BottomCtaButton = Root + "//div[contains(@class,'cta-bottom')]//button";
-            public const string BottomCtaText = BottomCtaButton + "[normalize-space()]";
-
-            public const string CloseButton = Root + "//button[@data-popup-close]";
-        }
     }
 }
